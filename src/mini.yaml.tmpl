@@ -1,0 +1,9 @@
+agent:
+  mode: confirm
+model:
+  model_name: "{{MODEL_NAME}}"
+  model_kwargs:
+    custom_llm_provider: "openai"
+    api_base: "https://chat-ai.academiccloud.de/v1"
+    drop_params: true
+  cost_tracking: "ignore_errors"

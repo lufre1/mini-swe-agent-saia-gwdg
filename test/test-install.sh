@@ -89,3 +89,13 @@ MODELS_JSON_OUT="$(curl -s -H "Authorization: Bearer dummy" "http://127.0.0.1:$P
 echo "$MODELS_JSON_OUT" | grep -q "fake-model" || fail "fake endpoint did not list models"
 
 echo "PASS: .env + mini.yaml + model_registry.json written, key persisted, fake endpoint answered"
+
+# ── SAIA_BASE_URL override (used by the benchmark's local gateway) ─────
+OV="$WORK/override"; mkdir -p "$OV/home"
+HOME="$OV/home" MSWEA_GLOBAL_CONFIG_DIR="$OV/config" SAIA_BASE_URL="http://127.0.0.1:$PORT/v1" \
+  SAIA_API_KEY=dummy bash ../src/add-saia-mini-swe-agent.sh >"$WORK/override.log" 2>&1 \
+  || fail "installer failed with SAIA_BASE_URL set"
+grep -q "api_base: .*http://127.0.0.1:$PORT/v1" "$OV/config/mini.yaml" \
+  || fail "SAIA_BASE_URL not written to mini.yaml"
+grep -q "chat-ai.academiccloud.de/v1" "$OV/config/mini.yaml" && fail "production URL left in mini.yaml"
+echo "PASS: SAIA_BASE_URL override"

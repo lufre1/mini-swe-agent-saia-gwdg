@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Base URL override for tests and local gateways (default: production SAIA).
+SAIA_BASE_URL="${SAIA_BASE_URL:-https://chat-ai.academiccloud.de/v1}"
+
 # add-saia-mini-swe-agent.sh — Add GWDG SAIA provider to mini-swe-agent
 #
 # Reads SAIA API key from environment variable SAIA_API_KEY or --key/--key-file.
@@ -252,7 +255,7 @@ fi
 
 MINI_YAML="$CONFIG_DIR/mini.yaml"
 backup_if_exists "$MINI_YAML"
-sed "s|{{MODEL_NAME}}|$DEFAULT_MODEL|g" "$MINI_YAML_TMPL" > "$MINI_YAML.saia"
+sed -e "s|{{MODEL_NAME}}|$DEFAULT_MODEL|g" -e "s|{{BASE_URL}}|$SAIA_BASE_URL|g" "$MINI_YAML_TMPL" > "$MINI_YAML.saia"
 MSWEA_SILENT_STARTUP=1 MSWEA_GLOBAL_CONFIG_DIR="$CONFIG_DIR" \
 "$MINI_PY" - "$MINI_YAML.saia" "$MINI_YAML" <<'PYEOF'
 import sys, yaml
@@ -316,7 +319,7 @@ chmod 600 "$ENV_FILE"
 echo ""
 echo "✓ GWDG SAIA provider configured for mini-swe-agent!"
 echo "  Config dir: $CONFIG_DIR"
-echo "  Base URL: https://chat-ai.academiccloud.de/v1"
+echo "  Base URL: $SAIA_BASE_URL"
 echo "  Default model: $DEFAULT_MODEL"
 echo "  Models: ${#MODELS[@]} ready SAIA models"
 echo ""

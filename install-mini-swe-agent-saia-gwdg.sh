@@ -2,7 +2,7 @@
 #
 # install-mini-swe-agent-saia-gwdg.sh — GENERATED FILE, DO NOT EDIT.
 # Regenerate with: ./build.sh  (in the mini-swe-agent-saia-gwdg repo)
-# Source: mini-swe-agent-saia-gwdg commit 718f7e0, packed 2026-09-30T05:54:14Z
+# Source: mini-swe-agent-saia-gwdg commit 3485fb8-dirty, packed 2026-10-05T10:01:23Z
 #
 # Installs the GWDG SAIA setup for mini-swe-agent: provider + models + default model.
 
@@ -59,6 +59,9 @@ mkdir -p "$EXTRACT_DIR/src"
 cat >"$EXTRACT_DIR/src/add-saia-mini-swe-agent.sh" <<'__MSA_EOF__'
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Base URL override for tests and local gateways (default: production SAIA).
+SAIA_BASE_URL="${SAIA_BASE_URL:-https://chat-ai.academiccloud.de/v1}"
 
 # add-saia-mini-swe-agent.sh — Add GWDG SAIA provider to mini-swe-agent
 #
@@ -311,7 +314,7 @@ fi
 
 MINI_YAML="$CONFIG_DIR/mini.yaml"
 backup_if_exists "$MINI_YAML"
-sed "s|{{MODEL_NAME}}|$DEFAULT_MODEL|g" "$MINI_YAML_TMPL" > "$MINI_YAML.saia"
+sed -e "s|{{MODEL_NAME}}|$DEFAULT_MODEL|g" -e "s|{{BASE_URL}}|$SAIA_BASE_URL|g" "$MINI_YAML_TMPL" > "$MINI_YAML.saia"
 MSWEA_SILENT_STARTUP=1 MSWEA_GLOBAL_CONFIG_DIR="$CONFIG_DIR" \
 "$MINI_PY" - "$MINI_YAML.saia" "$MINI_YAML" <<'PYEOF'
 import sys, yaml
@@ -375,7 +378,7 @@ chmod 600 "$ENV_FILE"
 echo ""
 echo "✓ GWDG SAIA provider configured for mini-swe-agent!"
 echo "  Config dir: $CONFIG_DIR"
-echo "  Base URL: https://chat-ai.academiccloud.de/v1"
+echo "  Base URL: $SAIA_BASE_URL"
 echo "  Default model: $DEFAULT_MODEL"
 echo "  Models: ${#MODELS[@]} ready SAIA models"
 echo ""
@@ -408,7 +411,7 @@ model:
   model_name: "{{MODEL_NAME}}"
   model_kwargs:
     custom_llm_provider: "openai"
-    api_base: "https://chat-ai.academiccloud.de/v1"
+    api_base: "{{BASE_URL}}"
     drop_params: true
   cost_tracking: "ignore_errors"
 __MSA_EOF__

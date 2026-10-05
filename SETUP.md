@@ -133,6 +133,42 @@ MSWEA_CONFIGURED=true
 
 **Note**: mini does not expand env vars in `mini.yaml`, so the key is not there. It is persisted to your shell rc as `SAIA_API_KEY`, and `.env` (loaded by mini through python-dotenv, which does expand `${...}`) maps it to `OPENAI_API_KEY`, the variable litellm reads. An `OPENAI_API_KEY` you already export takes precedence; unset it when running mini. The config files have 600 permissions (owner read/write only).
 
+## Multiple keys: automatic key swap
+
+SAIA rate limits are per key (30/min, 200/hour, 1000/day, 3000/month). Give the
+installer extra keys and mini-swe-agent swaps to the next one by itself when the active
+key is revoked (401/403), drained (its hour/day/month budget nearly used up) or rate
+limited (429) — the same rotation the opencode setup does.
+
+```bash
+# Extra keys via the environment, so they never show up in `ps`
+SAIA_API_KEYS_EXTRA="key2,key3" bash install-mini-swe-agent-saia-gwdg.sh --yes
+
+# Or reuse the extra keys of an opencode setup
+bash install-mini-swe-agent-saia-gwdg.sh --yes --extra-keys-file ~/.local/share/opencode/saia-gwdg-keys.json
+```
+
+With 2+ keys the installer starts **saia-keyring**, a small local proxy
+(`~/.local/share/saia-keyring/saia_keyring.py`, stdlib Python 3), and points
+`model_kwargs.api_base` in `~/.config/mini-swe-agent/mini.yaml` at
+`http://127.0.0.1:8788/v1` instead of SAIA. mini keeps sending its usual key
+(`OPENAI_API_KEY=${SAIA_API_KEY}`); the proxy only serves requests carrying one of the
+configured keys and forwards them on the active key. Every harness installed with extra
+keys shares the same proxy and key list. Keys are only swapped before a response
+starts — a response in progress is never cut over.
+
+| What | Where |
+|------|-------|
+| Keys | `~/.config/saia-keyring/keyring.json` (chmod 600), primary key first. A reinstall without extra keys keeps the stored ones; a changed list is backed up to `keyring.json.bak-<timestamp>` |
+| Status | `saia-keyring status` — per-key budget, the active key, rejected keys |
+| Log | `~/.cache/saia-keyring/proxy.log` |
+| Service | systemd user unit `saia-keyring` (Linux), launchd agent `de.gwdg.saia-keyring` (macOS), otherwise a line in your shell rc |
+| Turn off | re-run with `--no-keyring`: mini talks to SAIA directly again |
+
+With a single key nothing changes: mini talks to SAIA directly, as before. When every
+key is out, mini shows why — e.g. `All 3 SAIA key(s) rejected by SAIA (...) — the key(s)
+are revoked or expired` (mini does not retry a 401, so it stops right away).
+
 ## Troubleshooting
 
 ### Config not taking effect
@@ -162,7 +198,9 @@ If `mini` is still not on your PATH after install, add the pip bin dir to your P
 
 ## Advanced: Regenerate the installer
 
-If you modify `src/add-saia-mini-swe-agent.sh`, `src/models.txt`, `src/mini.yaml.tmpl` or `src/model_registry.json.tmpl`, regenerate the installer:
+If you modify `src/add-saia-mini-swe-agent.sh`, `src/models.txt`, `src/mini.yaml.tmpl` or `src/model_registry.json.tmpl`, regenerate the installer.
+`src/saia_keyring.py` and `src/saia-keyring.sh` are vendored from
+`opencode-extras/keyring/` — change them there and run its `keyring/sync.sh`.
 
 ```bash
 ./build.sh

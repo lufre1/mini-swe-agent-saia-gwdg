@@ -7,7 +7,10 @@
 # installs mini-swe-agent (a real mini must be present: the installer merges its builtin
 # mini.yaml). Verifies the generated .env, mini.yaml
 # and model_registry.json, that the key is persisted to the fake shell rc, and that the fake
-# SAIA endpoint answers.
+# SAIA endpoint answers. Then checks the automatic key swap: with two keys, the first one
+# revoked, mini's api_base is pointed at the local saia-keyring proxy and a request through
+# it fails over to the second key. The proxy is started with SAIA_KEYRING_SERVICE=none, so
+# no systemd unit or real shell rc is touched.
 #
 #   bash test/test-install.sh
 #
@@ -18,6 +21,7 @@ WORK="$(mktemp -d)"
 export HOME="$WORK/home"
 export MSWEA_GLOBAL_CONFIG_DIR="$WORK/config"
 export SAIA_SHELL_RC="$WORK/rc"
+export SAIA_KEYRING_SERVICE=none
 mkdir -p "$HOME" "$MSWEA_GLOBAL_CONFIG_DIR"
 touch "$SAIA_SHELL_RC"
 
@@ -25,12 +29,16 @@ command -v mini >/dev/null || { echo "FAIL: mini-swe-agent not installed (uv too
 
 cleanup() {
   [[ -n "${FAKE_PID:-}" ]] && kill "$FAKE_PID" 2>/dev/null || true
+  if [[ -n "${KR_PORT:-}" ]]; then
+    curl -s "http://127.0.0.1:$KR_PORT/_keyring/health" \
+      | python3 -c 'import json,os,sys; os.kill(json.load(sys.stdin)["pid"], 15)' 2>/dev/null || true
+  fi
   rm -rf "$WORK"
 }
 trap cleanup EXIT
 
 # ── Start the fake SAIA ──────────────────────────────────────────────
-python3 ./fake-saia.py >"$WORK/port" 2>"$WORK/fake.log" &
+FAKE_DEAD_KEYS=dead-key SEEN_FILE="$WORK/seen" python3 ./fake-saia.py >"$WORK/port" 2>"$WORK/fake.log" &
 FAKE_PID=$!
 for _ in $(seq 40); do [[ -s "$WORK/port" ]] && break; sleep 0.1; done
 PORT="$(cat "$WORK/port")"
@@ -99,3 +107,23 @@ grep -q "api_base: .*http://127.0.0.1:$PORT/v1" "$OV/config/mini.yaml" \
   || fail "SAIA_BASE_URL not written to mini.yaml"
 grep -q "chat-ai.academiccloud.de/v1" "$OV/config/mini.yaml" && fail "production URL left in mini.yaml"
 echo "PASS: SAIA_BASE_URL override"
+
+# ── Automatic key swap: two keys, the first one revoked ───────────────
+KR="$WORK/keyring"; mkdir -p "$KR/home"
+KR_PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+HOME="$KR/home" MSWEA_GLOBAL_CONFIG_DIR="$KR/config" SAIA_SHELL_RC="$KR/rc" SAIA_KEYRING_PORT="$KR_PORT" \
+  SAIA_BASE_URL="http://127.0.0.1:$PORT/v1" SAIA_API_KEY=dead-key \
+  bash ../src/add-saia-mini-swe-agent.sh --keyring --extra-keys good-key >"$WORK/keyring.log" 2>&1 \
+  || { cat "$WORK/keyring.log" >&2; fail "installer failed with --keyring"; }
+grep -q "^    api_base: http://127.0.0.1:$KR_PORT/v1$" "$KR/config/mini.yaml" \
+  || { cat "$WORK/keyring.log" >&2; fail "mini.yaml api_base not pointed at the keyring proxy"; }
+KR_CFG="$KR/home/.config/saia-keyring/keyring.json"
+[[ "$(python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$KR_CFG")" == 0o600 ]] \
+  || fail "keyring.json is not chmod 600"
+: >"$WORK/seen"
+CODE="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer dead-key" \
+  "http://127.0.0.1:$KR_PORT/v1/models")"
+[[ "$CODE" == 200 ]] || fail "request through the keyring proxy returned $CODE"
+[[ "$(paste -sd, "$WORK/seen")" == "dead-key,good-key" ]] \
+  || fail "proxy did not fail over from the revoked key (saw: $(paste -sd, "$WORK/seen"))"
+echo "PASS: automatic key swap (revoked key -> next key through the local proxy)"

@@ -19,15 +19,23 @@ SAIA_BASE_URL="${SAIA_BASE_URL:-https://chat-ai.academiccloud.de/v1}"
 # interpolation) and persisted to the user's shell rc so mini-swe-agent can
 # resolve it at runtime. The raw key is never written into the config files.
 #
+# With extra keys (SAIA_API_KEYS_EXTRA / --extra-keys / --extra-keys-file)
+# mini's api_base is pointed at the local saia-keyring proxy instead, which
+# swaps to the next key when the active one is revoked, drained or rate
+# limited (saia-keyring.sh).
+#
 # Usage:
 #   SAIA_API_KEY="your-key" ./add-saia-mini-swe-agent.sh
 #   ./add-saia-mini-swe-agent.sh --key "your-key"
 #   ./add-saia-mini-swe-agent.sh --key-file ~/.local/share/opencode/auth.json
+#   SAIA_API_KEYS_EXTRA="key2,key3" ./add-saia-mini-swe-agent.sh --key "your-key"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODELS_FILE="${SCRIPT_DIR}/models.txt"
 MINI_YAML_TMPL="${SCRIPT_DIR}/mini.yaml.tmpl"
 REGISTRY_TMPL="${SCRIPT_DIR}/model_registry.json.tmpl"
+# shellcheck source=saia-keyring.sh
+source "${SCRIPT_DIR}/saia-keyring.sh"
 
 # ── Parse arguments ──────────────────────────────────────────────────
 ASSUME_YES=0
@@ -49,6 +57,10 @@ while [[ $# -gt 0 ]]; do
       KEY_FILE="$2"
       shift 2
       ;;
+    --extra-keys|--extra-keys-file|--keyring|--no-keyring)
+      keyring_arg "$@"
+      shift "$KEYRING_SHIFT"
+      ;;
     -h|--help)
       echo "Usage: SAIA_API_KEY=... ./add-saia-mini-swe-agent.sh [--key <key> | --key-file <path>]"
       echo ""
@@ -56,6 +68,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --key <value>       SAIA API key (overrides SAIA_API_KEY env)"
       echo "  --key-file <path>   File containing the SAIA API key"
       echo "  -y, --yes           Install the agent without asking (for non-TTY runs)"
+      keyring_usage
       echo "  -h, --help          Show this help"
       echo ""
       echo "The API key is taken from:"
@@ -223,6 +236,10 @@ else
   echo "WARNING: no shell rc detected — export SAIA_API_KEY yourself before running mini." >&2
 fi
 
+# ── Automatic key swap (2+ keys) ─────────────────────────────────────
+# Sets SAIA_EFFECTIVE_BASE_URL: the local proxy when it is up, else SAIA itself.
+keyring_setup "$SAIA_KEY"
+
 # ── Write the config artifacts ───────────────────────────────────────
 CONFIG_DIR="${MSWEA_GLOBAL_CONFIG_DIR:-$HOME/.config/mini-swe-agent}"
 mkdir -p "$CONFIG_DIR"
@@ -255,7 +272,7 @@ fi
 
 MINI_YAML="$CONFIG_DIR/mini.yaml"
 backup_if_exists "$MINI_YAML"
-sed -e "s|{{MODEL_NAME}}|$DEFAULT_MODEL|g" -e "s|{{BASE_URL}}|$SAIA_BASE_URL|g" "$MINI_YAML_TMPL" > "$MINI_YAML.saia"
+sed -e "s|{{MODEL_NAME}}|$DEFAULT_MODEL|g" -e "s|{{BASE_URL}}|$SAIA_EFFECTIVE_BASE_URL|g" "$MINI_YAML_TMPL" > "$MINI_YAML.saia"
 MSWEA_SILENT_STARTUP=1 MSWEA_GLOBAL_CONFIG_DIR="$CONFIG_DIR" \
 "$MINI_PY" - "$MINI_YAML.saia" "$MINI_YAML" <<'PYEOF'
 import sys, yaml
@@ -319,7 +336,7 @@ chmod 600 "$ENV_FILE"
 echo ""
 echo "✓ GWDG SAIA provider configured for mini-swe-agent!"
 echo "  Config dir: $CONFIG_DIR"
-echo "  Base URL: $SAIA_BASE_URL"
+echo "  Base URL: $SAIA_EFFECTIVE_BASE_URL"
 echo "  Default model: $DEFAULT_MODEL"
 echo "  Models: ${#MODELS[@]} ready SAIA models"
 echo ""

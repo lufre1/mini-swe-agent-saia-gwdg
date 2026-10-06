@@ -20,7 +20,7 @@ This one-shot installer:
 - Writes `~/.config/mini-swe-agent/mini.yaml`: mini's builtin config with the model pointed at the GWDG SAIA endpoint
 - Writes `~/.config/mini-swe-agent/model_registry.json` registering the 14 ready models for cost tracking
 - Persists the key as `SAIA_API_KEY` in your shell rc (mini's `.env` maps it to `OPENAI_API_KEY=${SAIA_API_KEY}` for litellm)
-- With extra keys (`SAIA_API_KEYS_EXTRA="key2,key3"`), routes mini through a local
+- Optional, with `--keyring`: routes mini through a local
   key-rotating proxy that swaps keys automatically when one is revoked, drained or
   rate limited (see `SETUP.md` → *Multiple keys*)
 - Works on macOS, Linux, and WSL

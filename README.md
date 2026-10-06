@@ -37,7 +37,7 @@ Or see `SETUP.md` for detailed instructions and troubleshooting.
 | `src/models.txt` | List of 14 ready SAIA models |
 | `src/mini.yaml.tmpl` | mini-swe-agent agent config template (model_kwargs) |
 | `src/model_registry.json.tmpl` | litellm model registry template (cost tracking) |
-| `src/saia_keyring.py`, `src/saia-keyring.sh` | Key-rotating proxy and its install logic, vendored from `opencode-extras/keyring/` (never edit here) |
+| `src/saia_keyring.py`, `src/saia-keyring.sh` | Key-rotating proxy and its install logic, vendored from `opencode-saia-gwdg/keyring/` (never edit here) |
 | `test/fake-saia.py` | Fake SAIA endpoint for the smoke test (not packed) |
 | `test/test-install.sh` | Smoke test that verifies the config is written (not packed) |
 
@@ -61,7 +61,7 @@ SAIA_API_KEY → install-mini-swe-agent-saia-gwdg.sh → [pip install mini-swe-a
 ## Maintaining
 
 After changing `src/add-saia-mini-swe-agent.sh`, `src/models.txt`, `src/mini.yaml.tmpl` or `src/model_registry.json.tmpl`, regenerate the installer
-(the keyring files are synced in by `opencode-extras/keyring/sync.sh`, which also rebuilds):
+(the keyring files are synced in by `opencode-saia-gwdg/keyring/sync.sh`, which also rebuilds):
 
 ```bash
 ./build.sh

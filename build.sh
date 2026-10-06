@@ -4,7 +4,7 @@
 #
 # Reads the current src/add-saia-mini-swe-agent.sh, src/models.txt,
 # src/mini.yaml.tmpl, src/model_registry.json.tmpl and the vendored keyring
-# (src/saia_keyring.py, src/saia-keyring.sh — from opencode-extras) and emits
+# (src/saia_keyring.py, src/saia-keyring.sh — from opencode-saia-gwdg) and emits
 # a single self-contained installer that can be copied to other devices.
 # Rerun this after ANY change to those files, and commit both.
 #

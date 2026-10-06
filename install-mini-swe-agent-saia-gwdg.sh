@@ -2,7 +2,7 @@
 #
 # install-mini-swe-agent-saia-gwdg.sh — GENERATED FILE, DO NOT EDIT.
 # Regenerate with: ./build.sh  (in the mini-swe-agent-saia-gwdg repo)
-# Source: mini-swe-agent-saia-gwdg commit 864d107, packed 2026-10-06T06:16:05Z
+# Source: mini-swe-agent-saia-gwdg commit 9f74c9e, packed 2026-10-06T06:16:27Z
 #
 # Installs the GWDG SAIA setup for mini-swe-agent: provider + models + default model.
 
@@ -22,9 +22,9 @@ Options:
   -y, --yes           answer yes to prompts (e.g. installing mini-swe-agent)
       --key <value>   SAIA API key (overrides SAIA_API_KEY env)
       --key-file <p>  file containing the SAIA API key
-      --extra-keys <k2,k3>      extra SAIA keys for automatic failover
+      --extra-keys <k2,k3>      with --keyring: extra SAIA keys to swap to
                                 (or SAIA_API_KEYS_EXTRA, which keeps them out of ps)
-      --extra-keys-file <path>  extra keys from {"keys": [...]} (opencode's
+      --extra-keys-file <path>  with --keyring: extra keys from {"keys": [...]} (opencode's
                                 saia-gwdg-keys.json) or one key per line
       --keyring                 opt in: route through the local key-rotating proxy
       --no-keyring              talk to SAIA directly with one key (the default)
